@@ -9,7 +9,11 @@ import { Permission } from '@kiltprotocol/types'
 import { UUID } from '@kiltprotocol/utils'
 import { AttestedClaim, Identity } from '..'
 import Attestation from '../attestation/Attestation'
-import { IS_IN_BLOCK, submitTxWithReSign } from '../blockchain/Blockchain.utils'
+import {
+  IS_IN_BLOCK,
+  IS_READY,
+  submitTxWithReSign,
+} from '../blockchain/Blockchain.utils'
 import { config, disconnect } from '../kilt'
 import Claim from '../claim/Claim'
 import {
@@ -103,9 +107,7 @@ describe('when there is an account hierarchy', () => {
       HashSignedByDelegate = attester.signStr(delegatedNode.generateHash())
       await rootNode
         .store(uncleSam)
-        .then((tx) =>
-          submitTxWithReSign(tx, uncleSam, { resolveOn: IS_IN_BLOCK })
-        )
+        .then((tx) => submitTxWithReSign(tx, uncleSam, { resolveOn: IS_READY }))
       await delegatedNode.store(uncleSam, HashSignedByDelegate).then((tx) =>
         submitTxWithReSign(tx, uncleSam, {
           resolveOn: IS_IN_BLOCK,

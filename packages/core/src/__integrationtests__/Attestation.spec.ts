@@ -8,7 +8,11 @@ import { IAttestedClaim, IClaim } from '@kiltprotocol/types'
 import Attestation from '../attestation/Attestation'
 import { revoke } from '../attestation/Attestation.chain'
 import AttestedClaim from '../attestedclaim/AttestedClaim'
-import { IS_IN_BLOCK, submitTxWithReSign } from '../blockchain/Blockchain.utils'
+import {
+  IS_IN_BLOCK,
+  IS_READY,
+  submitTxWithReSign,
+} from '../blockchain/Blockchain.utils'
 
 import { config, disconnect } from '../kilt'
 import Claim from '../claim/Claim'
@@ -63,7 +67,7 @@ describe('When there is an attester, claimer and ctype drivers license', () => {
     // console.log(`verify stored: ${await DriversLicense.verifyStored()}`)
     if (!ctypeExists) {
       await DriversLicense.store(attester).then((tx) =>
-        submitTxWithReSign(tx, attester, { resolveOn: IS_IN_BLOCK })
+        submitTxWithReSign(tx, attester, { resolveOn: IS_READY })
       )
     }
   }, 60_000)
