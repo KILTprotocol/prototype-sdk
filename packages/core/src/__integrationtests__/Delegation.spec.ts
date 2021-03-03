@@ -4,8 +4,7 @@
  * @ignore
  */
 
-import { cryptoWaitReady } from '@polkadot/util-crypto'
-import { Permission } from '@kiltprotocol/types'
+import { ICType, Permission } from '@kiltprotocol/types'
 import { UUID } from '@kiltprotocol/utils'
 import { BlockchainUtils } from '@kiltprotocol/chain-helpers'
 import { AttestedClaim, Identity } from '..'
@@ -30,141 +29,217 @@ import {
   WS_ADDRESS,
 } from './utils'
 
+async function writeRoot(delegator: Identity, ctypeHash: ICType['hash']) {
+  const root = new DelegationRootNode(
+    UUID.generate(),
+    ctypeHash,
+    delegator.address
+  )
+  await root.store(delegator).then((tx) =>
+    BlockchainUtils.submitTxWithReSign(tx, delegator, {
+      resolveOn: BlockchainUtils.IS_IN_BLOCK,
+    })
+  )
+  return root
+}
+async function addDelegation(
+  parentNode: DelegationRootNode | DelegationNode,
+  delegator: Identity,
+  delegee: Identity,
+  permissions: Permission[]
+): Promise<DelegationNode> {
+  const rootId =
+    parentNode instanceof DelegationRootNode ? parentNode.id : parentNode.rootId
+  const delegation = new DelegationNode(
+    UUID.generate(),
+    rootId,
+    delegee.address,
+    permissions,
+    parentNode.id
+  )
+  await delegation
+    .store(delegator, delegee.signStr(delegation.generateHash()))
+    .then((tx) =>
+      BlockchainUtils.submitTxWithReSign(tx, delegator, {
+        resolveOn: BlockchainUtils.IS_IN_BLOCK,
+      })
+    )
+  return delegation
+}
+
+let root: Identity
+let claimer: Identity
+let attester: Identity
+
 beforeAll(async () => {
   config({ address: WS_ADDRESS })
-})
+  root = wannabeFaucet
+  claimer = wannabeBob
+  attester = wannabeAlice
 
-describe('when there is an account hierarchy', () => {
-  let uncleSam: Identity
-  let claimer: Identity
-  let attester: Identity
+  if (!(await CtypeOnChain(DriversLicense))) {
+    await DriversLicense.store(attester).then((tx) =>
+      BlockchainUtils.submitTxWithReSign(tx, attester, {
+        resolveOn: BlockchainUtils.IS_IN_BLOCK,
+      })
+    )
+  }
+}, 30_000)
+
+it('should be possible to delegate attestation rights', async () => {
+  const rootNode = await writeRoot(root, DriversLicense.hash)
+  const delegatedNode = await addDelegation(rootNode, root, attester, [
+    Permission.ATTEST,
+  ])
+  await Promise.all([
+    expect(rootNode.verify()).resolves.toBeTruthy(),
+    expect(delegatedNode.verify()).resolves.toBeTruthy(),
+  ])
+}, 60_000)
+
+describe('and attestation rights have been delegated', () => {
+  let rootNode: DelegationRootNode
+  let delegatedNode: DelegationNode
 
   beforeAll(async () => {
-    await cryptoWaitReady()
-    uncleSam = wannabeFaucet
-    claimer = wannabeBob
-    attester = wannabeAlice
+    rootNode = await writeRoot(root, DriversLicense.hash)
+    delegatedNode = await addDelegation(rootNode, root, attester, [
+      Permission.ATTEST,
+    ])
 
-    if (!(await CtypeOnChain(DriversLicense))) {
-      await DriversLicense.store(attester).then((tx) =>
-        BlockchainUtils.submitTxWithReSign(tx, attester, {
-          resolveOn: BlockchainUtils.IS_IN_BLOCK,
-        })
-      )
-    }
-  }, 30_000)
-
-  it('should be possible to delegate attestation rights', async () => {
-    const rootNode = new DelegationRootNode(
-      UUID.generate(),
-      DriversLicense.hash,
-      uncleSam.address
-    )
-    await rootNode.store(uncleSam).then((tx) =>
-      BlockchainUtils.submitTxWithReSign(tx, uncleSam, {
-        resolveOn: BlockchainUtils.IS_IN_BLOCK,
-      })
-    )
-    const delegatedNode = new DelegationNode(
-      UUID.generate(),
-      rootNode.id,
-      attester.address,
-      [Permission.ATTEST],
-      rootNode.id
-    )
-    const HashSignedByDelegate = attester.signStr(delegatedNode.generateHash())
-    await delegatedNode.store(uncleSam, HashSignedByDelegate).then((tx) =>
-      BlockchainUtils.submitTxWithReSign(tx, uncleSam, {
-        resolveOn: BlockchainUtils.IS_IN_BLOCK,
-      })
-    )
     await Promise.all([
       expect(rootNode.verify()).resolves.toBeTruthy(),
       expect(delegatedNode.verify()).resolves.toBeTruthy(),
     ])
   }, 75_000)
 
-  describe('and attestation rights have been delegated', () => {
-    let rootNode: DelegationRootNode
-    let delegatedNode: DelegationNode
-    let HashSignedByDelegate: string
+  it("should be possible to attest a claim in the root's name and revoke it by the root", async () => {
+    const content = {
+      name: 'Ralph',
+      age: 12,
+    }
+    const claim = Claim.fromCTypeAndClaimContents(
+      DriversLicense,
+      content,
+      claimer.address
+    )
+    const request = RequestForAttestation.fromClaimAndIdentity(claim, claimer, {
+      delegationId: delegatedNode.id,
+    })
+    expect(request.verifyData()).toBeTruthy()
+    expect(request.verifySignature()).toBeTruthy()
 
-    beforeAll(async () => {
-      rootNode = new DelegationRootNode(
-        UUID.generate(),
-        DriversLicense.hash,
-        uncleSam.address
-      )
-      delegatedNode = new DelegationNode(
-        UUID.generate(),
-        rootNode.id,
-        attester.address,
-        [Permission.ATTEST],
-        rootNode.id
-      )
-      HashSignedByDelegate = attester.signStr(delegatedNode.generateHash())
-      await rootNode.store(uncleSam).then((tx) =>
-        BlockchainUtils.submitTxWithReSign(tx, uncleSam, {
-          resolveOn: BlockchainUtils.IS_IN_BLOCK,
-        })
-      )
-      await delegatedNode.store(uncleSam, HashSignedByDelegate).then((tx) =>
-        BlockchainUtils.submitTxWithReSign(tx, uncleSam, {
-          resolveOn: BlockchainUtils.IS_IN_BLOCK,
-        })
-      )
-      await Promise.all([
-        expect(rootNode.verify()).resolves.toBeTruthy(),
-        expect(delegatedNode.verify()).resolves.toBeTruthy(),
-      ])
-    }, 75_000)
+    const attestation = Attestation.fromRequestAndPublicIdentity(
+      request,
+      attester.getPublicIdentity()
+    )
+    await attestation.store(attester).then((tx) =>
+      BlockchainUtils.submitTxWithReSign(tx, attester, {
+        resolveOn: BlockchainUtils.IS_IN_BLOCK,
+      })
+    )
 
-    it("should be possible to attest a claim in the root's name and revoke it by the root", async () => {
-      const content = {
-        name: 'Ralph',
-        age: 12,
-      }
-      const claim = Claim.fromCTypeAndClaimContents(
-        DriversLicense,
-        content,
-        claimer.address
-      )
-      const request = RequestForAttestation.fromClaimAndIdentity(
-        claim,
-        claimer,
-        {
-          delegationId: delegatedNode.id,
-        }
-      )
-      expect(request.verifyData()).toBeTruthy()
-      expect(request.verifySignature()).toBeTruthy()
+    const attClaim = AttestedClaim.fromRequestAndAttestation(
+      request,
+      attestation
+    )
+    expect(attClaim.verifyData()).toBeTruthy()
+    await expect(attClaim.verify()).resolves.toBeTruthy()
 
-      const attestation = Attestation.fromRequestAndPublicIdentity(
-        request,
-        attester.getPublicIdentity()
-      )
-      await attestation.store(attester).then((tx) =>
-        BlockchainUtils.submitTxWithReSign(tx, attester, {
-          resolveOn: BlockchainUtils.IS_IN_BLOCK,
-        })
-      )
+    // revoke attestation through root
+    await attClaim.attestation.revoke(root, 1).then((tx) =>
+      BlockchainUtils.submitTxWithReSign(tx, root, {
+        resolveOn: BlockchainUtils.IS_IN_BLOCK,
+      })
+    )
+    await expect(attClaim.verify()).resolves.toBeFalsy()
+  }, 75_000)
+})
 
-      const attClaim = AttestedClaim.fromRequestAndAttestation(
-        request,
-        attestation
-      )
-      expect(attClaim.verifyData()).toBeTruthy()
-      await expect(attClaim.verify()).resolves.toBeTruthy()
+describe('revocation', () => {
+  let delegator: Identity = root
+  let firstDelegee: Identity = attester
+  let secondDelegee: Identity = claimer
 
-      // revoke attestation through root
-      await attClaim.attestation.revoke(uncleSam, 1).then((tx) =>
-        BlockchainUtils.submitTxWithReSign(tx, uncleSam, {
-          resolveOn: BlockchainUtils.IS_IN_BLOCK,
-        })
-      )
-      await expect(attClaim.verify()).resolves.toBeFalsy()
-    }, 75_000)
+  beforeAll(() => {
+    delegator = root
+    firstDelegee = attester
+    secondDelegee = claimer
   })
+
+  it('delegator can revoke delegation', async () => {
+    const delegationRoot = await writeRoot(delegator, DriversLicense.hash)
+    const delegationA = await addDelegation(
+      delegationRoot,
+      delegator,
+      firstDelegee,
+      [Permission.ATTEST]
+    )
+    await expect(
+      delegationA.revoke(delegator).then((tx) =>
+        BlockchainUtils.submitTxWithReSign(tx, delegator, {
+          resolveOn: BlockchainUtils.IS_IN_BLOCK,
+        })
+      )
+    ).resolves.not.toThrow()
+    await expect(delegationA.verify()).resolves.toBe(false)
+  }, 40_000)
+
+  it('delegee cannot revoke root but can revoke own delegation', async () => {
+    const delegationRoot = await writeRoot(delegator, DriversLicense.hash)
+    const delegationA = await addDelegation(
+      delegationRoot,
+      delegator,
+      firstDelegee,
+      [Permission.ATTEST]
+    )
+    await expect(
+      delegationRoot.revoke(firstDelegee).then((tx) =>
+        BlockchainUtils.submitTxWithReSign(tx, firstDelegee, {
+          resolveOn: BlockchainUtils.IS_IN_BLOCK,
+        })
+      )
+    ).rejects.toThrow()
+    await expect(delegationRoot.verify()).resolves.toBe(true)
+
+    await expect(
+      delegationA.revoke(firstDelegee).then((tx) =>
+        BlockchainUtils.submitTxWithReSign(tx, firstDelegee, {
+          resolveOn: BlockchainUtils.IS_IN_BLOCK,
+        })
+      )
+    ).resolves.not.toThrow()
+    await expect(delegationA.verify()).resolves.toBe(false)
+  }, 60_000)
+
+  it('delegator can revoke root, revoking all delegations in tree', async () => {
+    const delegationRoot = await writeRoot(delegator, DriversLicense.hash)
+    const delegationA = await addDelegation(
+      delegationRoot,
+      delegator,
+      firstDelegee,
+      [Permission.ATTEST, Permission.DELEGATE]
+    )
+    const delegationB = await addDelegation(
+      delegationA,
+      firstDelegee,
+      secondDelegee,
+      [Permission.ATTEST]
+    )
+    await expect(
+      delegationRoot.revoke(delegator).then((tx) =>
+        BlockchainUtils.submitTxWithReSign(tx, delegator, {
+          resolveOn: BlockchainUtils.IS_IN_BLOCK,
+        })
+      )
+    ).resolves.not.toThrow()
+
+    await Promise.all([
+      expect(delegationRoot.verify()).resolves.toBe(false),
+      expect(delegationA.verify()).resolves.toBe(false),
+      expect(delegationB.verify()).resolves.toBe(false),
+    ])
+  }, 60_000)
 })
 
 describe('handling queries to data not on chain', () => {

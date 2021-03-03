@@ -3,7 +3,6 @@ import {
   PublicIdentity,
   SDKErrors,
   Identity,
-  DelegationNodeUtils,
 } from '@kiltprotocol/core'
 import type {
   IAttestation,
@@ -106,16 +105,20 @@ export async function revokeAttestation(
   if (attestation === null) {
     throw SDKErrors.ERROR_NOT_FOUND('Attestation not on chain')
   }
-  // count the number of steps we have to go up the delegation tree for calculating the transaction weight
-  const delegationTreeTraversalSteps = await DelegationNodeUtils.countNodeDepth(
-    attester,
-    attestation
+  // check if we can revoke + count the number of steps we have to go up the delegation tree
+  // the latter is necessary for calculating the transaction weight
+  const { authorized, delegationDepth, error } = await attestation.revocableBy(
+    attester.address
   )
+
+  if (!authorized) {
+    throw error
+  }
 
   await Attestation.revoke(
     revocationHandle.claimHash,
     attester,
-    delegationTreeTraversalSteps
+    delegationDepth
   ).then((tx: SubmittableExtrinsic) =>
     BlockchainUtils.submitTxWithReSign(tx, attester)
   )

@@ -3,10 +3,7 @@
  * @ignore
  */
 
-import { IAttestation, IDelegationNode } from '@kiltprotocol/types'
-import { SDKErrors } from '@kiltprotocol/utils'
-import Identity from '../identity'
-import DelegationNode from './DelegationNode'
+import { IDelegationNode } from '@kiltprotocol/types'
 
 /**
  * Creates a bitset from the permissions in the array where each enum value
@@ -30,36 +27,4 @@ export default function permissionsAsBitset(
   const uint8: Uint8Array = new Uint8Array(4)
   uint8[0] = permissionsBitsetData
   return uint8
-}
-
-export async function countNodeDepth(
-  attester: Identity,
-  attestation: IAttestation
-): Promise<number> {
-  let delegationTreeTraversalSteps = 0
-
-  // if the attester is not the owner, we need to check the delegation tree
-  if (
-    attestation.owner !== attester.address &&
-    attestation.delegationId !== null
-  ) {
-    delegationTreeTraversalSteps += 1
-    const delegationNode = await DelegationNode.query(attestation.delegationId)
-
-    if (typeof delegationNode !== 'undefined' && delegationNode !== null) {
-      const { steps, node } = await delegationNode.findParent(attester.address)
-      delegationTreeTraversalSteps += steps
-      if (node === null) {
-        throw SDKErrors.ERROR_UNAUTHORIZED(
-          'Attester is not athorized to revoke this attestation. (attester not in delegation tree)'
-        )
-      }
-    }
-  } else if (attestation.owner !== attester.address) {
-    throw SDKErrors.ERROR_UNAUTHORIZED(
-      'Attester is not athorized to revoke this attestation. (not the owner, no delegations)'
-    )
-  }
-
-  return delegationTreeTraversalSteps
 }

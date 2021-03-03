@@ -84,8 +84,9 @@ export default class DelegationRootNode extends DelegationBaseNode
   }
 
   public async revoke(identity: Identity): Promise<SubmittableExtrinsic> {
+    const childCount = await this.subtreeNodeCount()
     log.debug(`:: revoke(${this.id})`)
-    return revoke(this, identity)
+    return revoke(this, identity, childCount + 1)
   }
 
   public async getChildren(): Promise<DelegationNode[]> {

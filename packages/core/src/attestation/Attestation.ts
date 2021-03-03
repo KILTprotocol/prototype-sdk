@@ -19,7 +19,7 @@ import {
   CompressedAttestation,
 } from '@kiltprotocol/types'
 import Identity from '../identity/Identity'
-import { revoke, query, store } from './Attestation.chain'
+import { revoke, query, store, canRevoke } from './Attestation.chain'
 import AttestationUtils from './Attestation.utils'
 import DelegationRootNode from '../delegation/DelegationRootNode'
 import DelegationNode from '../delegation/DelegationNode'
@@ -196,6 +196,12 @@ export default class Attestation implements IAttestation {
     maxDepth: number
   ): Promise<SubmittableExtrinsic> {
     return revoke(this.claimHash, identity, maxDepth)
+  }
+
+  public async revocableBy(
+    address: Identity['address']
+  ): ReturnType<typeof canRevoke> {
+    return canRevoke(address, this)
   }
 
   /**

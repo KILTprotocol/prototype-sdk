@@ -120,7 +120,10 @@ describe('Delegation', () => {
     const revokeStatus = await aDelegationRootNode
       .revoke(identityAlice)
       .then((tx) => BlockchainUtils.submitTxWithReSign(tx, identityAlice))
-    expect(blockchain.api.tx.delegation.revokeRoot).toBeCalledWith('myRootId')
+    expect(blockchain.api.tx.delegation.revokeRoot).toBeCalledWith(
+      'myRootId',
+      1
+    )
     expect(revokeStatus).toBeDefined()
   })
 })

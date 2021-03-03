@@ -104,4 +104,50 @@ export default abstract class DelegationBaseNode
    * @returns Promise containing a submittable transaction.
    */
   public abstract revoke(identity: Identity): Promise<SubmittableExtrinsic>
+
+  /**
+   * Checks on chain whether a given identity is delegating to the current node.
+   *
+   * @param address The address of the identity.
+   * @returns An object containing a node owned by the identity if it is delegating, plus the number of steps traversed.
+   */
+  public async isDelegating(
+    address: Identity['address']
+  ): Promise<{ steps: number; node: DelegationBaseNode | null }> {
+    if (this.account === address) {
+      return {
+        steps: 0,
+        node: this,
+      }
+    }
+    const parent = await this.getParent()
+    if (parent) {
+      const result = await parent.isDelegating(address)
+      result.steps += 1
+      return result
+    }
+    return {
+      steps: 0,
+      node: null,
+    }
+  }
+
+  /**
+   * Recursively counts all nodes in the branches below the current node (excluding the current node).
+   *
+   * @returns Promise resolving to the node count.
+   */
+  public async subtreeNodeCount(): Promise<number> {
+    const children = await this.getChildren()
+    if (children.length > 0) {
+      const childrensChildCounts = await Promise.all(
+        children.map((child) => child.subtreeNodeCount())
+      )
+      return (
+        children.length +
+        childrensChildCounts.reduce((previous, current) => previous + current)
+      )
+    }
+    return 0
+  }
 }

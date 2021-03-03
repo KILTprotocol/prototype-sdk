@@ -119,46 +119,11 @@ export default class DelegationNode extends DelegationBaseNode
    */
 
   public async getParent(): Promise<DelegationBaseNode | null> {
-    if (!this.parentId) {
+    if (!this.parentId || this.parentId === this.rootId) {
       // parent must be root
       return this.getRoot()
     }
     return query(this.parentId)
-  }
-
-  public async findParent(
-    address: string
-  ): Promise<{
-    steps: number
-    node: DelegationNode | null
-  }> {
-    if (typeof this.parentId === 'undefined') {
-      return {
-        steps: 0,
-        node: null,
-      }
-    }
-
-    let delegationTreeTraversalSteps = 0
-    let delegationNode = await DelegationNode.query(this.parentId)
-
-    // while there is a parent and we have a node but not the right node ...
-    while (
-      delegationNode !== null &&
-      typeof delegationNode.parentId !== 'undefined' &&
-      delegationNode?.account !== address
-    ) {
-      delegationTreeTraversalSteps += 1
-
-      // this 'await in loop' is unavoidable because we need the node for the next await
-      // eslint-disable-next-line no-await-in-loop
-      delegationNode = await DelegationNode.query(delegationNode.parentId)
-    }
-
-    return {
-      steps: delegationTreeTraversalSteps,
-      node: delegationNode,
-    }
   }
 
   /**
@@ -193,8 +158,21 @@ export default class DelegationNode extends DelegationBaseNode
    * @returns Promise containing a SubmittableExtrinsic.
    */
   public async revoke(identity: Identity): Promise<SubmittableExtrinsic> {
-    log.debug(`:: revoke(${this.id})`)
-    return revoke(this.id, identity)
+    const { steps, node } = await this.isDelegating(identity.address)
+    if (!node) {
+      throw SDKErrors.ERROR_UNAUTHORIZED(
+        `Identity with address ${identity.address} is not among the delegators and may not revoke this node`
+      )
+    }
+    const childCount = await this.subtreeNodeCount()
+    // must revoke all children and self
+    const revocationCount = childCount + 1
+    // node side implementation requires steps + 1
+    const depth = steps + 1
+    log.debug(
+      `:: revoke(${this.id}) with maxRevocations=${revocationCount} and maxDepth = ${depth} through delegation node ${node?.id} and identity ${identity.address}`
+    )
+    return revoke(this.id, identity, depth, revocationCount)
   }
 
   public async getChildren(): Promise<DelegationNode[]> {

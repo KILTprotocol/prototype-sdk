@@ -3,14 +3,19 @@
  * @ignore
  */
 import { Option, Struct } from '@polkadot/types'
-import type { IAttestation, SubmittableExtrinsic } from '@kiltprotocol/types'
-import { DecoderUtils } from '@kiltprotocol/utils'
+import type {
+  IAttestation,
+  IIdentity,
+  SubmittableExtrinsic,
+} from '@kiltprotocol/types'
+import { DecoderUtils, SDKErrors } from '@kiltprotocol/utils'
 import { AccountId, Hash } from '@polkadot/types/interfaces'
 import { ConfigService } from '@kiltprotocol/config'
 import { BlockchainApiConnection } from '@kiltprotocol/chain-helpers'
 import Identity from '../identity/Identity'
 import Attestation from './Attestation'
 import { DelegationNodeId } from '../delegation/DelegationDecoder'
+import DelegationNode from '../delegation/DelegationNode'
 
 const log = ConfigService.LoggingFactory.getLogger('Attestation')
 
@@ -90,4 +95,49 @@ export async function revoke(
     maxDepth
   )
   return blockchain.signTx(identity, tx)
+}
+
+export async function canRevoke(
+  address: IIdentity['address'],
+  attestation: IAttestation
+): Promise<{
+  authorized: boolean
+  delegationDepth: number
+  error?: SDKErrors.SDKError
+}> {
+  const result: {
+    authorized: boolean
+    delegationDepth: number
+    error?: SDKErrors.SDKError
+  } = { authorized: false, delegationDepth: 0 }
+  // can revoke if owner
+  if (attestation.owner === address) {
+    result.authorized = true
+    return result
+  }
+  // else we need to check the delegation tree
+  if (attestation.delegationId) {
+    const delegationNode = await DelegationNode.query(attestation.delegationId)
+    if (!delegationNode) {
+      throw SDKErrors.ERROR_NOT_FOUND(
+        `attestation invalid; delegation with id ${attestation.delegationId} does not exist on chain`
+      )
+    }
+    const { steps, node } = await delegationNode.isDelegating(address)
+    // steps between nodes plus lookup of first delegation node
+    result.delegationDepth = steps + 1
+    if (!node) {
+      result.error = SDKErrors.ERROR_UNAUTHORIZED(
+        'not authorized to revoke this attestation. (not in delegation tree)'
+      )
+      return result
+    }
+    result.authorized = true
+    return result
+  }
+  //
+  result.error = SDKErrors.ERROR_UNAUTHORIZED(
+    'not authorized to revoke this attestation. (not the owner, no delegations)'
+  )
+  return result
 }
