@@ -1,0 +1,38 @@
+{
+  "name": "@kiltprotocol/did",
+  "version": "0.20.0",
+  "description": "",
+  "main": "./lib/index.js",
+  "typings": "./lib/index.d.ts",
+  "files": [
+    "lib/**/*"
+  ],
+  "scripts": {
+    "clean": "rimraf ./lib",
+    "build": "yarn clean && yarn build:ts",
+    "build:ts": "tsc --declaration -p tsconfig.build.json"
+  },
+  "repository": "github:kiltprotocol/sdk-js",
+  "engines": {
+    "node": ">=10.0"
+  },
+  "author": "",
+  "license": "BSD-4-Clause",
+  "bugs": "https://github.com/KILTprotocol/sdk-js/issues",
+  "homepage": "https://github.com/KILTprotocol/sdk-js#readme",
+  "devDependencies": {
+    "rimraf": "^3.0.2",
+    "typescript": "^3.9.7"
+  },
+  "dependencies": {
+    "@kiltprotocol/chain-helpers": "workspace:*",
+    "@kiltprotocol/types": "workspace:*",
+    "@kiltprotocol/utils": "workspace:*",
+    "@kiltprotocol/core": "workspace:*",
+    "@polkadot/types": "^3.11.1",
+    "@polkadot/util-crypto": "^5.9.2",
+    "@types/ed2curve": "^0.2.2",
+    "ed2curve": "^0.3.0",
+    "tweetnacl": "^1.0.3"
+  }
+}

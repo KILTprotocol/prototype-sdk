@@ -859,6 +859,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@kiltprotocol/did@workspace:packages/kilt-did":
+  version: 0.0.0-use.local
+  resolution: "@kiltprotocol/did@workspace:packages/kilt-did"
+  dependencies:
+    "@kiltprotocol/chain-helpers": "workspace:*"
+    "@kiltprotocol/types": "workspace:*"
+    "@kiltprotocol/utils": "workspace:*"
+    "@polkadot/types": ^3.11.1
+    "@polkadot/util-crypto": ^5.9.2
+    "@types/ed2curve": ^0.2.2
+    ed2curve: ^0.3.0
+    rimraf: ^3.0.2
+    tweetnacl: ^1.0.3
+    typescript: ^3.9.7
+  languageName: unknown
+  linkType: soft
+
 "@kiltprotocol/messaging@workspace:*, @kiltprotocol/messaging@workspace:packages/messaging":
   version: 0.0.0-use.local
   resolution: "@kiltprotocol/messaging@workspace:packages/messaging"
@@ -1291,6 +1308,15 @@ __metadata:
   version: 1.1.1
   resolution: "@types/color-name@npm:1.1.1"
   checksum: 8311db94a9c4ecd247763b81e783ee49d87678b4ce6a7ee502e2bd5cea242b7357804a04855db009f713174bc654cc0c01c7303d40d757e5d710f5ac0368500f
+  languageName: node
+  linkType: hard
+
+"@types/ed2curve@npm:^0.2.2":
+  version: 0.2.2
+  resolution: "@types/ed2curve@npm:0.2.2"
+  dependencies:
+    tweetnacl: ^1.0.0
+  checksum: e353f24984cd8fc578356e691e2df2c20d2c0948ea124aa162e9e3bbf665f94ad4459ff52b7858fb1e55cefda17e56614342dc0b68ada8d6048060356f4fc717
   languageName: node
   linkType: hard
 
@@ -2848,6 +2874,15 @@ __metadata:
     jsbn: ~0.1.0
     safer-buffer: ^2.1.0
   checksum: 5b4dd05f24b2b94c1bb882488dba2b878bb5b83182669aa71fbdf53c6941618180cb226c4eb9a3e2fa51ad11f87b5edb0a7d7289cdef468ba2e6024542f73f07
+  languageName: node
+  linkType: hard
+
+"ed2curve@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "ed2curve@npm:0.3.0"
+  dependencies:
+    tweetnacl: 1.x.x
+  checksum: ccd1c79c815f7bab18110f474ce5257877db55e36b96576b7541ef43a862013e75378f9e82ef2cb640f6112b3a8be16ad72ebbc382c8069ba00b5362329d4c07
   languageName: node
   linkType: hard
 
@@ -7940,17 +7975,17 @@ fsevents@^2.1.2:
   languageName: node
   linkType: hard
 
+"tweetnacl@npm:1.x.x, tweetnacl@npm:^1.0.0, tweetnacl@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "tweetnacl@npm:1.0.3"
+  checksum: 1188f3ef85db04d6dba632d211e481ae0a5805974491633ff60bd56ae3362312dfea1515e0d200685867b69ff212e8778e26923f8203e3c335064b07f620a6c7
+  languageName: node
+  linkType: hard
+
 "tweetnacl@npm:^0.14.3, tweetnacl@npm:~0.14.0":
   version: 0.14.5
   resolution: "tweetnacl@npm:0.14.5"
   checksum: e1c9d52e2e9f582fd0df9ea26ba5a9ab88b9a38b69625d8e55c5e8870a4832ac8c32f8854b41fce7b59f97258bb103535363f9eda7050aa70e75824b972c7dde
-  languageName: node
-  linkType: hard
-
-"tweetnacl@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "tweetnacl@npm:1.0.3"
-  checksum: 1188f3ef85db04d6dba632d211e481ae0a5805974491633ff60bd56ae3362312dfea1515e0d200685867b69ff212e8778e26923f8203e3c335064b07f620a6c7
   languageName: node
   linkType: hard
 
