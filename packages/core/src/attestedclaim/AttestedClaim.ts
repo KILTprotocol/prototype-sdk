@@ -14,11 +14,14 @@ import type {
   CompressedAttestedClaim,
   IAttestation,
   IRequestForAttestation,
+  IPresentationOptions,
+  IPresentationSigningOptions,
 } from '@kiltprotocol/types'
 import { SDKErrors } from '@kiltprotocol/utils'
 import Attestation from '../attestation/Attestation'
 import RequestForAttestation from '../requestforattestation/RequestForAttestation'
 import AttestedClaimUtils from './AttestedClaim.utils'
+import { Presentation, SignedPresentation } from './Presentation'
 
 export default class AttestedClaim implements IAttestedClaim {
   /**
@@ -184,6 +187,25 @@ export default class AttestedClaim implements IAttestedClaim {
   public getAttributes(): Set<string> {
     // TODO: move this to claim or contents
     return new Set(Object.keys(this.request.claim.contents))
+  }
+
+  public createPresentation({
+    showAttributes,
+    hideAttributes = [],
+    signer,
+    challenge,
+  }: IPresentationOptions & Partial<IPresentationSigningOptions> = {}):
+    | Presentation
+    | SignedPresentation {
+    const allAttributes = Array.from(this.getAttributes())
+    const excludedClaimProperties = showAttributes
+      ? allAttributes.filter((i) => !showAttributes.includes(i))
+      : []
+    excludedClaimProperties.push(...hideAttributes)
+    const deepCopy = new AttestedClaim(JSON.parse(JSON.stringify(this)))
+    deepCopy.request.removeClaimProperties(excludedClaimProperties)
+    const signingOpts = signer && challenge ? { signer, challenge } : undefined
+    return Presentation.fromAttestedClaims([deepCopy], signingOpts)
   }
 
   /**

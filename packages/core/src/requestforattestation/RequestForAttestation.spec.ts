@@ -134,15 +134,6 @@ describe('RequestForAttestation', () => {
     }).toThrow()
   })
 
-  it('hides the claim owner', async () => {
-    const request = buildRequestForAttestation(identityBob, {}, [])
-    request.removeClaimOwner()
-    expect(Object.keys(request.claimNonceMap)).toHaveLength(
-      request.claimHashes.length - 1
-    )
-    expect(request.claim.owner).toBeUndefined()
-  })
-
   it('compresses and decompresses the request for attestation object', async () => {
     const legitimationAttestationBob = Attestation.fromRequestAndPublicIdentity(
       legitimationRequest,

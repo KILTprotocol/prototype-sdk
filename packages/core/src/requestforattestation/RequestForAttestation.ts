@@ -194,25 +194,6 @@ export default class RequestForAttestation implements IRequestForAttestation {
   }
 
   /**
-   * Removes the [[Claim]] owner from the [[RequestForAttestation]] object.
-   *
-   * @example ```javascript
-   * const reqForAtt = RequestForAttestation.fromClaimAndIdentity({
-   *   claim,
-   *   identity: alice,
-   * });
-   * reqForAtt.removeClaimOwner();
-   * // `input` does not contain the claim `owner` or the `claimOwner`'s nonce anymore.
-   * ```
-   */
-  public removeClaimOwner(): void {
-    delete this.claim.owner
-    this.claimNonceMap = ClaimUtils.hashClaimContents(this.claim, {
-      nonces: this.claimNonceMap,
-    }).nonceMap
-  }
-
-  /**
    * Verifies the data of the [[RequestForAttestation]] object; used to check that the data was not tampered with, by checking the data against hashes.
    *
    * @param input - The [[RequestForAttestation]] for which to verify data.
