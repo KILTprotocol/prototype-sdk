@@ -10,6 +10,7 @@
  * @module IBalance
  */
 
+import { AnyNumber } from '@polkadot/types/types'
 import type BN from 'bn.js'
 
 export type Balances = {
@@ -26,4 +27,27 @@ export interface BalanceOptions {
   withSi?: boolean
   withSiFull?: boolean
   withUnit?: boolean | string
+  locale?: string
 }
+
+export type BalanceNumber = Exclude<AnyNumber, Uint8Array>
+
+export type metricPrefix =
+  | 'femto'
+  | 'pico'
+  | 'nano'
+  | 'micro'
+  | 'milli'
+  | 'centi'
+  | 'kilt'
+  | 'kilo'
+  | 'mega'
+  | 'mill'
+  | 'giga'
+  | 'bill'
+  | 'tera'
+  | 'tril'
+  | 'peta'
+  | 'exa'
+  | 'zetta'
+  | 'yotta'
