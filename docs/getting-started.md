@@ -188,7 +188,7 @@ await Kilt.BlockchainUtils.submitSignedTx(tx)
 Please note that the **same CTYPE can only be stored once** on the blockchain.
 
 If a transaction fails with an by re-signing recoverable error (e.g. multi device nonce collision),
-BlockchainUtils.signAndSubmitTx has the ability to re-sign and re-send the failed tx upt to 2 times, if the appropriate flag is set:
+BlockchainUtils.signAndSubmitTx has the ability to re-sign and re-send the failed tx up to 2 times, if the appropriate flag is set:
 
 ```typescript
 await Kilt.BlockchainUtils.signAndSubmitTx(tx, identity, {
@@ -348,7 +348,7 @@ The messaging system is transport agnostic.
 const decrypted = Kilt.Message.decrypt(encrypted, attester)
 ```
 
-As sender identity and message validity are also checked during decryption, if the decryption process completes successfully, you can assume that the sender of the message is also the owner of the claim, as the two identites match.
+As sender identity and message validity are also checked during decryption, if the decryption process completes successfully, you can assume that the sender of the message is also the owner of the claim, as the two identities match.
 At this point the Attester has the original request for attestation object:
 
 ```typescript
@@ -511,16 +511,13 @@ const messageForClaimer = new Kilt.Message(
 ```
 
 Now the claimer can send a message to the verifier including the attested claim.
-They may choose to create a copy and remove selected properties from it:
+They may choose to create a copy disclosing only selected properties. In the following example, we only disclose the `name` attribute of our credential, omitting `age`:
 
 ```typescript
-const copiedCredential = Kilt.AttestedClaim.fromAttestedClaim(
-  JSON.parse(JSON.stringify(myAttestedClaim))
-)
-copiedCredential.request.removeClaimProperties(['age'])
+const credentialCopy = myAttestedClaim.createPresentation(['name'])
 
 const messageBodyForVerifier: MessageBody = {
-  content: [copiedCredential],
+  content: [credentialCopy],
   type: Kilt.Message.BodyType.SUBMIT_CLAIMS_FOR_CTYPES,
 }
 const messageForVerifier = new Kilt.Message(
@@ -528,23 +525,85 @@ const messageForVerifier = new Kilt.Message(
   claimer.getPublicIdentity(),
   verifier.getPublicIdentity()
 )
+
+const encrypted = messageForVerifier.encrypt(
+  claimer,
+  verifier.getPublicIdentity()
+)
 ```
 
 ### 6.2. Verify presentation
 
-When verifying the claimer's message, the verifier has to use their session which was created during the CTYPE request.
-The result will be a boolean indicating the result of the verification and the attested claim(s) which are either sent in their entirety OR have been stripped off of the properties that the verifier did not request to verify.
+When verifying the claimer's message, the verifier checks that 3 important requirements are met:
+
+- The credential is valid, i.e. it has been registered to the public ledger, has not been revoked, and the data has not been tampered with.
+- The attester who registered the credential is one that this verifier trusts.
+- The submission is coming from the legitimate owner of this credential, i.e. the credential has not been stolen.
 
 ```typescript
+const messageForVerifier = Kilt.Message.decrypt(encrypted, verifier)
+// Our messages are signed, so we authenticate the sender already during decryption, which internally calls:
+Kilt.Message.ensureHashAndSignature(encrypted, claimer.address)
+Kilt.Message.ensureOwnerIsSender(messageForVerifier)
+
 if (
   messageForVerifier.body.type ===
   Kilt.Message.BodyType.SUBMIT_CLAIMS_FOR_CTYPES
 ) {
   const claims = messageForVerifier.body.content
-  const isValid = await Kilt.AttestedClaim.fromAttestedClaim(claims[0]).verify()
-  console.log('Verifcation success?', isValid)
   console.log('Attested claims from verifier perspective:\n', claims)
+
+  const credential = Kilt.AttestedClaim.fromAttestedClaim(claims[0])
+
+  // credential is registered on chain, has not been tampered with, and has not been revoked
+  const isValid = await credential.verify()
+  console.log('Verification success?', isValid)
+
+  // AttestedClaim exposes attester address to compare against a whitelist of trusted attesters
+  console.log('Attester address:', credential)
 }
+```
+
+### 6.3. Replay Protection
+
+In certain use cases, an attacker may intercept and copy credential submissions traveling from claimers to verifiers in an attempt to convince the verifier to accept the credential submission again later on.
+To give an example for illustration purposes only, think of a turnstile that allows passage only upon presentation of a valid access credential.
+To prevent these types of attacks, KILT messages are timestamped and expose a unique identifier (the message hash).
+Verifiers should impose limits on the acceptable range for these timestamps and keep a record of previous submissions, which can be purged after their acceptance range has run out.
+
+Define acceptance range and set up a record of past submissions:
+
+```typescript
+const MAX_ACCEPTED_AGE = 60_000 // ms -> 1 minute
+const MIN_ACCEPTED_AGE = -1_000 // allow for some imprecision in system time
+const submissions = new Map<string, number>()
+```
+
+Check record for each incoming message and update if accepted:
+
+```typescript
+// is hash fresh and createdAt recent ?
+if (
+  submissions.has(encrypted.hash) ||
+  encrypted.createdAt < Date.now() - MAX_ACCEPTED_AGE ||
+  encrypted.createdAt > Date.now() - MIN_ACCEPTED_AGE
+) {
+  // no -> reject message
+} else {
+  submissions.set(encrypted.hash, encrypted.createdAt)
+  // yes -> accept & process message
+}
+```
+
+Purge at regular intervals:
+
+```typescript
+setInterval(() => {
+  const maxTime = Date.now() - MAX_ACCEPTED_AGE
+  submissions.forEach((timestamp, hash) => {
+    if (timestamp < maxTime) submissions.delete(hash)
+  })
+}, 1000)
 ```
 
 ## 7. Disconnect from chain

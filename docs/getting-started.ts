@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     { signingKeyPairType: 'ed25519' }
   )
 
-  /* First, we create the request for an attestation message in which the Claimer automatically encodes the message with the public key of the Attester: */
+  /* First, we create the request for an attestation message */
   const messageBody: MessageBody = {
     content: { requestForAttestation },
     type: Kilt.Message.BodyType.REQUEST_ATTESTATION_FOR_CLAIM,
@@ -114,7 +114,7 @@ async function main(): Promise<void> {
   /* The message can be encrypted as follows: */
   const encrypted = message.encrypt(claimer, attester.getPublicIdentity())
 
-  /* Therefore, **during decryption** both the **sender identity and the validity of the message are checked automatically**. */
+  /* During **decryption** both the **sender identity and the validity of the message are checked automatically**. */
   const decrypted = Kilt.Message.decrypt(encrypted, attester)
 
   /* At this point the Attester has the original request for attestation object: */
@@ -191,13 +191,10 @@ async function main(): Promise<void> {
       /* Now the claimer can send a message to verifier including the attested claim: */
       console.log('Requested from verifier:', messageForClaimer.body.content)
 
-      const copiedCredential = Kilt.AttestedClaim.fromAttestedClaim(
-        JSON.parse(JSON.stringify(myAttestedClaim))
-      )
-      copiedCredential.request.removeClaimProperties(['age'])
+      const credentialCopy = myAttestedClaim.createPresentation(['name'])
 
       const messageBodyForVerifier: MessageBody = {
-        content: [copiedCredential],
+        content: [credentialCopy],
         type: Kilt.Message.BodyType.SUBMIT_CLAIMS_FOR_CTYPES,
       }
       const messageForVerifier = new Kilt.Message(
@@ -206,19 +203,35 @@ async function main(): Promise<void> {
         verifier.getPublicIdentity()
       )
 
+      // const encrypted = messageForVerifier.encrypt(claimer, verifier.getPublicIdentity())
+
       /* 6.2 Verify presentation */
       /* When verifying the claimer's message, the verifier has to use their session which was created during the CTYPE request: */
+
+      // const messageForVerifier = Kilt.Message.decrypt(encrypted, verifier)
+      // Kilt.Message.ensureHashAndSignature(encrypted, claimer.address)
+      Kilt.Message.ensureOwnerIsSender(messageForVerifier)
+
       if (
         messageForVerifier.body.type ===
         Kilt.Message.BodyType.SUBMIT_CLAIMS_FOR_CTYPES
       ) {
         const claims = messageForVerifier.body.content
-        const isValid = await Kilt.AttestedClaim.fromAttestedClaim(
-          claims[0]
-        ).verify()
-        console.log('Verifcation success?', isValid)
         console.log('Attested claims from verifier perspective:\n', claims)
+
+        const credential = Kilt.AttestedClaim.fromAttestedClaim(claims[0])
+
+        // credential is registered on chain, has not been tampered with, and has not been revoked
+        const isValid = await credential.verify()
+        console.log('Verification success?', isValid)
+
+        // AttestedClaim exposes attester address to compare against a whitelist of trusted attesters
+        console.log('Attester address:', credential)
       }
+
+      /* 6.3 Replay Protection */
+
+      // not included here
     }
   }
 }
